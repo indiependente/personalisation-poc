@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  dynamodb:
+    image: amazon/dynamodb-local
+    ports:
+      - "8000:8000"
+    environment:
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - AWS_REGION=us-east-1
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    # volumes:
+    #   - dynamodb-data:/data
+  
+  dynamo-ui:
+    image: aaronshaf/dynamodb-admin
+    container_name: dynamo-ui
+    restart: always
+    ports:
+      - 8001:8001
+    environment:
+      - DYNAMO_ENDPOINT=http://dynamodb:8000
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+    links:
+      - dynamodb
+    depends_on:
+      - dynamodb
+
+  init-dynamo:
+    image: amazon/aws-cli
+    command: "dynamodb create-table --table-name user_profiles \
+      --attribute-definitions AttributeName=pk,AttributeType=S \
+      AttributeName=sk,AttributeType=S \
+      --key-schema AttributeName=pk,KeyType=HASH \
+      AttributeName=sk,KeyType=RANGE \
+      --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=5 \
+      --endpoint-url http://dynamodb:8000"
+    restart: on-failure
+    links:
+      - dynamodb
+    depends_on:
+      - dynamodb
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+
+  userprofiles:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DYNAMO_ENDPOINT=http://dynamodb:8000
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+    depends_on:
+      - dynamodb
+
+# volumes:
+#   dynamodb-data:  
